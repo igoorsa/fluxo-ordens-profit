@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fluxo Scalper - Painel</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Fluxo Scalper</h1>
+      <p>Monitoramento em tempo real de agressões e book.</p>
+    </div>
+    <div class="status">
+      <span id="connectionStatus" class="badge">Conectando…</span>
+      <div class="clock" id="clock"></div>
+    </div>
+  </header>
+
+  <main class="grid">
+    <section class="panel settings">
+      <h2>Configurações</h2>
+      <div class="form-grid">
+        <label>
+          Base URL
+          <input id="baseUrl" type="text" value="http://localhost:52465" />
+        </label>
+        <label>
+          Janela (segundos)
+          <input id="windowSeconds" type="number" min="1" max="10" value="1" />
+        </label>
+        <label>
+          Níveis do book
+          <input id="levels" type="number" min="1" max="20" value="10" />
+        </label>
+        <label>
+          Intervalo de atualização (ms)
+          <input id="pollInterval" type="number" min="250" step="250" value="1000" />
+        </label>
+      </div>
+      <div class="form-actions">
+        <button id="applySettings">Aplicar</button>
+        <button id="toggleSim" class="ghost">Modo simulado</button>
+      </div>
+      <p class="hint">Dica: use janelas curtas para capturar agressões rápidas no scalping.</p>
+    </section>
+
+    <section class="panel kpi">
+      <h2>Indicador 1 · Fluxo por janela</h2>
+      <div class="kpi-grid">
+        <div class="kpi-card buy">
+          <span>Compras na janela</span>
+          <strong id="buyWindow">0</strong>
+          <small>Média 60 janelas: <span id="buyAvg">0</span></small>
+          <div class="box">
+            Caixa BUY: <span id="buyBox">0</span>
+          </div>
+        </div>
+        <div class="kpi-card sell">
+          <span>Vendas na janela</span>
+          <strong id="sellWindow">0</strong>
+          <small>Média 60 janelas: <span id="sellAvg">0</span></small>
+          <div class="box">
+            Caixa SELL: <span id="sellBox">0</span>
+          </div>
+        </div>
+        <div class="kpi-card prl">
+          <span>PRL (Compra - Venda)</span>
+          <strong id="prlWindow">0</strong>
+          <small>Média 60 janelas: <span id="prlAvg">0</span></small>
+          <div class="box">
+            Caixa PRL: <span id="prlBox">0</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel imbalance">
+      <h2>Indicador 2 · Imbalance do book</h2>
+      <div class="imbalance-row">
+        <div>
+          <div class="imbalance-value" id="imbalanceValue">0%</div>
+          <p>Imbalance nos <strong><span id="levelsLabel">10</span> níveis</strong>.</p>
+          <p class="muted">(Buy - Sell) / (Buy + Sell)</p>
+        </div>
+        <div class="imbalance-bar">
+          <div id="imbalanceFill"></div>
+        </div>
+        <div class="imbalance-details">
+          <div>Buy: <span id="imbalanceBuy">0</span></div>
+          <div>Sell: <span id="imbalanceSell">0</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel extra">
+      <h2>Indicadores extras</h2>
+      <div class="kpi-grid">
+        <div class="kpi-card neutral">
+          <span>Delta acumulado</span>
+          <strong id="deltaAccum">0</strong>
+          <small>Compras - Vendas (todas as trades)</small>
+        </div>
+        <div class="kpi-card neutral">
+          <span>Volume último minuto</span>
+          <strong id="volumeMinute">0</strong>
+          <small>Somatório de lotes nos últimos 60s</small>
+        </div>
+        <div class="kpi-card neutral">
+          <span>Preço médio agressão</span>
+          <strong id="avgPrice">0</strong>
+          <small>Média ponderada por volume</small>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel tape">
+      <h2>Time & Trades (últimos 10)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Hora</th>
+            <th>Agressor</th>
+            <th>Preço</th>
+            <th>Qtd</th>
+            <th>Broker</th>
+          </tr>
+        </thead>
+        <tbody id="tapeBody"></tbody>
+      </table>
+    </section>
+
+    <section class="panel alerts">
+      <h2>Alertas · Agressão acima da média</h2>
+      <p class="muted">Últimas janelas com agressão acima da média de 60 períodos.</p>
+      <ul id="alertsList" class="alerts-list"></ul>
+    </section>
+  </main>
+
+  <footer>
+    <span>Fluxo Scalper · Painel local</span>
+    <span id="lastUpdate">Última atualização: --</span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
