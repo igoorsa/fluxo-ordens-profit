@@ -253,6 +253,47 @@ button.ghost {
   background: rgba(255, 255, 255, 0.02);
 }
 
+.tape tbody tr.buy-row td {
+  color: var(--accent);
+}
+
+.tape tbody tr.sell-row td {
+  color: var(--accent-red);
+}
+
+.alerts-list {
+  list-style: none;
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.alerts-list li {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--panel-light);
+  border: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.alerts-list li.buy {
+  border-color: rgba(0, 245, 160, 0.5);
+  color: var(--accent);
+}
+
+.alerts-list li.sell {
+  border-color: rgba(255, 77, 79, 0.5);
+  color: var(--accent-red);
+}
+
+.alerts-list .meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .muted {
   color: var(--muted);
   font-size: 12px;

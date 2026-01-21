@@ -14,6 +14,7 @@ const state = {
     sell: 0,
     prl: 0,
   },
+  alerts: [],
   useSimulation: false,
 };
 
@@ -44,6 +45,7 @@ const elements = {
   volumeMinute: document.getElementById("volumeMinute"),
   avgPrice: document.getElementById("avgPrice"),
   tapeBody: document.getElementById("tapeBody"),
+  alertsList: document.getElementById("alertsList"),
   lastUpdate: document.getElementById("lastUpdate"),
 };
 
@@ -70,6 +72,18 @@ const SIM_BOOK = [
 ];
 
 const parseNumber = (value) => Number(String(value).replace(/[^0-9.-]/g, "")) || 0;
+
+const sumOfferLots = (value) => {
+  if (Array.isArray(value)) {
+    return value.reduce((sum, entry) => sum + parseNumber(entry?.quantity ?? entry), 0);
+  }
+  if (typeof value === "string" && /[|,;/]/.test(value)) {
+    return value
+      .split(/[|,;/]/)
+      .reduce((sum, part) => sum + parseNumber(part), 0);
+  }
+  return parseNumber(value);
+};
 
 const toTodaySeconds = (timeString) => {
   const [h, m, s] = timeString.split(":").map((value) => parseInt(value, 10));
@@ -110,15 +124,45 @@ const updateBox = (key, value, avg) => {
   }
 };
 
+const getLatestTradeTime = (trades) => {
+  const times = trades
+    .map((trade) => toTodaySeconds(trade.date || ""))
+    .filter((time) => typeof time === "number");
+  if (!times.length) {
+    return { timeMs: Date.now(), label: new Date().toLocaleTimeString("pt-BR") };
+  }
+  const timeMs = Math.max(...times);
+  const label = new Date(timeMs).toLocaleTimeString("pt-BR");
+  return { timeMs, label };
+};
+
+const addAlert = (side, volume, timeLabel) => {
+  state.alerts.unshift({ side, volume, timeLabel });
+  if (state.alerts.length > 30) {
+    state.alerts.pop();
+  }
+  elements.alertsList.innerHTML = state.alerts
+    .map((alert) => {
+      const cls = alert.side === "Compra" ? "buy" : "sell";
+      return `
+        <li class="${cls}">
+          <span>${alert.side} acima da média · ${alert.volume}</span>
+          <span class="meta">${alert.timeLabel}</span>
+        </li>
+      `;
+    })
+    .join("");
+};
+
 const computeWindowMetrics = (trades) => {
-  const now = Date.now();
+  const latest = getLatestTradeTime(trades);
   const windowMs = state.windowSeconds * 1000;
-  const from = now - windowMs;
+  const from = latest.timeMs - windowMs;
 
   const windowTrades = trades.filter((trade) => {
     const tradeTime = toTodaySeconds(trade.date || "");
     if (!tradeTime) return false;
-    return tradeTime >= from && tradeTime <= now;
+    return tradeTime >= from && tradeTime <= latest.timeMs;
   });
 
   const buy = windowTrades
@@ -143,6 +187,13 @@ const computeWindowMetrics = (trades) => {
   updateBox("sell", sell, sellAvg);
   updateBox("prl", prl, prlAvg);
 
+  if (buyAvg > 0 && buy > buyAvg) {
+    addAlert("Compra", buy.toFixed(0), latest.label);
+  }
+  if (sellAvg > 0 && sell > sellAvg) {
+    addAlert("Venda", sell.toFixed(0), latest.label);
+  }
+
   elements.buyWindow.textContent = buy.toFixed(0);
   elements.sellWindow.textContent = sell.toFixed(0);
   elements.prlWindow.textContent = prl.toFixed(0);
@@ -155,6 +206,7 @@ const computeWindowMetrics = (trades) => {
 };
 
 const computeExtras = (trades) => {
+  const latest = getLatestTradeTime(trades);
   const delta = trades.reduce((sum, trade) => {
     const qty = parseNumber(trade.quantity);
     if (trade.aggressor?.toLowerCase().includes("comprador")) return sum + qty;
@@ -162,8 +214,7 @@ const computeExtras = (trades) => {
     return sum;
   }, 0);
 
-  const now = Date.now();
-  const from = now - 60 * 1000;
+  const from = latest.timeMs - 60 * 1000;
   const volumeMinute = trades.reduce((sum, trade) => {
     const tradeTime = toTodaySeconds(trade.date || "");
     if (!tradeTime || tradeTime < from) return sum;
@@ -193,8 +244,10 @@ const updateTape = (trades) => {
   elements.tapeBody.innerHTML = recent
     .map((trade) => {
       const broker = trade.buyer || trade.seller || "-";
+      const aggressor = trade.aggressor?.toLowerCase() || "";
+      const rowClass = aggressor.includes("comprador") ? "buy-row" : aggressor.includes("vendedor") ? "sell-row" : "";
       return `
-        <tr>
+        <tr class="${rowClass}">
           <td>${trade.date || "--"}</td>
           <td>${trade.aggressor || "--"}</td>
           <td>${trade.price || "--"}</td>
@@ -209,8 +262,14 @@ const updateTape = (trades) => {
 const computeImbalance = (book) => {
   const levels = Math.min(state.levels, book.length);
   const slice = book.slice(0, levels);
-  const buy = slice.reduce((sum, row) => sum + parseNumber(row.buyQuantity), 0);
-  const sell = slice.reduce((sum, row) => sum + parseNumber(row.sellQuantity), 0);
+  const buy = slice.reduce((sum, row) => {
+    if (row.buyOffers) return sum + sumOfferLots(row.buyOffers);
+    return sum + sumOfferLots(row.buyQuantity);
+  }, 0);
+  const sell = slice.reduce((sum, row) => {
+    if (row.sellOffers) return sum + sumOfferLots(row.sellOffers);
+    return sum + sumOfferLots(row.sellQuantity);
+  }, 0);
   const total = buy + sell;
   const imbalance = total ? (buy - sell) / total : 0;
 
@@ -252,7 +311,14 @@ const loadData = async () => {
     book = SIM_BOOK;
   }
 
-  const sortedTrades = Array.isArray(trades) ? [...trades].sort((a, b) => (b.row || 0) - (a.row || 0)) : [];
+  const sortedTrades = Array.isArray(trades)
+    ? [...trades].sort((a, b) => {
+        const timeA = toTodaySeconds(a.date || "") || 0;
+        const timeB = toTodaySeconds(b.date || "") || 0;
+        if (timeA === timeB) return (b.row || 0) - (a.row || 0);
+        return timeB - timeA;
+      })
+    : [];
   const bookRows = Array.isArray(book) ? book : [];
 
   computeWindowMetrics(sortedTrades);
